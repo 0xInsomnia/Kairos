@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0B0C0E">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Kairos">
+<title>Kairos</title>
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Newsreader:ital,opsz,wght@0,6..72,500;0,6..72,600;1,6..72,500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0B0C0E;
+  --fg: #ECECE8;
+  --card: #131416;
+  --muted: #8D8F8C;
+  --line: rgba(236,236,232,.10);
+  --input: rgba(236,236,232,.12);
+  --profit: #6AAB7F;
+  --loss: #D07060;
+  --be: #A8A49A;
+  --primary: #E8E6DF;
+  --on-primary: #0B0C0E;
+  --radius: 10px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  background: var(--bg); color: var(--fg);
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  min-height: 100%; -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+}
+body { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; border: none; background: none; }
+.wrap { max-width: 720px; margin: 0 auto; padding: 16px 16px 0; }
+.top {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 0 16px; gap: 12px;
+}
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand img { width: 28px; height: 28px; border-radius: 6px; }
+.brand h1 { font-family: Newsreader, Georgia, serif; font-size: 22px; font-weight: 600; }
+.icon-btn {
+  width: 40px; height: 40px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--card);
+  display: grid; place-items: center; color: var(--fg);
+}
+.primary {
+  background: var(--primary); color: var(--on-primary);
+  border-radius: 10px; padding: 10px 14px; font-weight: 600;
+}
+.primary.block { width: 100%; padding: 14px; }
+.ghost {
+  border: 1px solid var(--line); background: var(--card);
+  border-radius: 10px; padding: 10px 14px;
+}
+.kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.kpi { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px; }
+.kpi .l { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.kpi .v { font-family: "IBM Plex Mono", monospace; font-size: 22px; margin-top: 6px; }
+.pos { color: var(--profit); } .neg { color: var(--loss); }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px; }
+.empty { text-align: center; padding: 48px 12px; }
+.empty h2 { font-family: Newsreader, Georgia, serif; font-size: 28px; font-weight: 500; margin-bottom: 8px; }
+.empty p { color: var(--muted); margin-bottom: 20px; }
+.row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 0; border-bottom: 1px solid var(--line);
+}
+.row:last-child { border-bottom: 0; }
+.sym { font-weight: 600; }
+.meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.pill { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); }
+.nav {
+  position: fixed; left: 0; right: 0; bottom: 0;
+  background: rgba(11,12,14,.94); backdrop-filter: blur(12px);
+  border-top: 1px solid var(--line);
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  padding: 6px 8px calc(8px + env(safe-area-inset-bottom));
+  z-index: 20;
+}
+.nav button { color: var(--muted); font-size: 11px; padding: 6px 0; }
+.nav button.on { color: var(--fg); }
+.nav svg { display: block; margin: 0 auto 2px; }
+.sheet {
+  position: fixed; inset: 0; background: var(--bg); z-index: 30; overflow: auto;
+  padding: 16px 16px calc(28px + env(safe-area-inset-bottom));
+}
+.sheet h2 { font-family: Newsreader, Georgia, serif; font-size: 26px; margin: 8px 0 16px; }
+.field { margin-bottom: 12px; }
+.field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+.field input, .field select, .field textarea {
+  width: 100%; background: #17181b; border: 1px solid var(--input);
+  border-radius: 10px; padding: 12px; color: var(--fg);
+}
+.field textarea { min-height: 80px; resize: vertical; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  border: 1px solid var(--line); border-radius: 999px; padding: 6px 10px; font-size: 13px;
+  background: #17181b;
+}
+.chip.on { background: var(--primary); color: var(--on-primary); border-color: transparent; }
+.actions { display: flex; gap: 8px; margin-top: 16px; }
+.actions .primary, .actions .ghost, .danger { flex: 1; padding: 14px; border-radius: 10px; }
+.danger { background: #3a1e1a; color: #f2c2b8; }
+.cat { display: flex; gap: 8px; margin-top: 8px; }
+.cat input { flex: 1; background: #17181b; border: 1px solid var(--input); border-radius: 10px; padding: 10px; }
+.item {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 10px 0; border-bottom: 1px solid var(--line);
+}
+.item b { font-weight: 500; }
+.tiny { font-size: 12px; color: var(--muted); }
+.ranges { display: flex; gap: 6px; margin: 0 0 12px; }
+.ranges button { padding: 6px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.ranges button.on { background: var(--primary); color: var(--on-primary); border-color: transparent; }
+canvas { width: 100%; height: 140px; display: block; }
+.heat { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.heat .d { aspect-ratio: 1; border-radius: 4px; background: #1a1b1e; font-size: 10px; display: grid; place-items: center; color: var(--muted); }
+.heat .d.p { background: rgba(106,171,127,.35); color: #cfe8d6; }
+.heat .d.n { background: rgba(208,112,96,.35); color: #f3cfc8; }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<nav class="nav" id="nav"></nav>
+<script>
+'use strict';
+const KEY = 'kairos-journal';
+const SYMBOLS = ['EURUSD','GBPUSD','USDJPY','XAUUSD','NAS100','US500','GER40','BTCUSD','ETHUSD'];
+const SETUPS = ['FVG','Breakout','Pullback','Order block','Mean reversion','News','Scalping'];
+const MISTAKES = ['FOMO','Revenge','Oversize','Uscita anticipata','Stop spostato','Nessun piano','Overtrading','Contro trend'];
+const SESSIONS = ['asia','london','newyork','overlap'];
+const I18N = {
+  it: {
+    home:'Diario', trades:'Operazioni', cal:'Calendario', an:'Analisi', set:'Impostazioni',
+    empty:'Il diario è vuoto', emptySub:'Registra la prima operazione. P&L, win rate e curva di equity arrivano da soli.',
+    new:'Nuova operazione', pnl:'P&L', wr:'Win rate', r:'R medio', n:'Trade',
+    pair:'Coppia', dir:'Direzione', long:'Long', short:'Short', setup:'Strategia', session:'Sessione',
+    status:'Stato', open:'Aperto', closed:'Chiuso', entry:'Ingresso', exit:'Uscita', stop:'Stop', tp:'Take profit',
+    size:'Size', fees:'Commissioni', risk:'Rischio €', mood:'Mood', notes:'Note', mistakes:'Errori',
+    save:'Salva', cancel:'Annulla', del:'Elimina', capital:'Capitale iniziale', lang:'Lingua',
+    cats:'Cataloghi', add:'Aggiungi', rename:'Rinomina', symbols:'Coppie', setups:'Strategie',
+    export:'Esporta', imp:'Importa', clear:'Cancella dati', done:'Fatto',
+    install:'Installa Kairos',
+  },
+  en: {
+    home:'Journal', trades:'Trades', cal:'Calendar', an:'Analytics', set:'Settings',
+    empty:'The journal is empty', emptySub:'Log the first trade. P&L, win rate and equity curve follow.',
+    new:'New trade', pnl:'P&L', wr:'Win rate', r:'Avg R', n:'Trades',
+    pair:'Pair', dir:'Direction', long:'Long', short:'Short', setup:'Strategy', session:'Session',
+    status:'Status', open:'Open', closed:'Closed', entry:'Entry', exit:'Exit', stop:'Stop', tp:'Take profit',
+    size:'Size', fees:'Fees', risk:'Risk', mood:'Mood', notes:'Notes', mistakes:'Mistakes',
+    save:'Save', cancel:'Cancel', del:'Delete', capital:'Starting capital', lang:'Language',
+    cats:'Catalogs', add:'Add', rename:'Rename', symbols:'Pairs', setups:'Strategies',
+    export:'Export', imp:'Import', clear:'Clear data', done:'Done',
+    install:'Install Kairos',
+  }
+};
+I18N.es = Object.assign({}, I18N.en, { home:'Diario', trades:'Operaciones', cal:'Calendario', an:'Análisis', set:'Ajustes', empty:'El diario está vacío', new:'Nueva operación', pair:'Par', setup:'Estrategia', save:'Guardar', del:'Eliminar' });
+I18N.fr = Object.assign({}, I18N.en, { home:'Journal', trades:'Opérations', cal:'Calendrier', an:'Analyse', set:'Réglages', empty:'Le journal est vide', new:'Nouvelle opération', pair:'Paire', setup:'Stratégie', save:'Enregistrer', del:'Supprimer' });
+I18N.de = Object.assign({}, I18N.en, { home:'Journal', trades:'Trades', cal:'Kalender', an:'Analyse', set:'Einstellungen', empty:'Das Journal ist leer', new:'Neuer Trade', pair:'Paar', setup:'Strategie', save:'Speichern', del:'Löschen' });
+
+function t(k){ return (I18N[state.locale]||I18N.it)[k] || (I18N.it[k]||k); }
+function uid(){ return crypto.randomUUID ? crypto.randomUUID() : String(Date.now())+Math.random(); }
+function parseIt(s){
+  if (s == null || s === '') return null;
+  const n = Number(String(s).trim().replace(/\s/g,'').replace(/\./g,'').replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+}
+function fmtN(n, d=2){
+  if (n == null || !Number.isFinite(n)) return '—';
+  return new Intl.NumberFormat(state.locale==='en'?'en-US':'it-IT',{minimumFractionDigits:d,maximumFractionDigits:d}).format(n);
+}
+function fmtMoney(n){ return (n>0?'+':'') + fmtN(n,2) + ' €'; }
+function clsPnl(n){ return n>0?'pos':n<0?'neg':''; }
+function load(){
+  try { return JSON.parse(localStorage.getItem(KEY)||''); } catch { return null; }
+}
+function save(){
+  localStorage.setItem(KEY, JSON.stringify({
+    trades: state.trades, symbols: state.symbols, setups: state.setups,
+    mistakes: state.mistakes, startingCapital: state.startingCapital, locale: state.locale
+  }));
+}
+const loaded = load() || {};
+const state = {
+  view: 'home',
+  locale: loaded.locale || 'it',
+  trades: loaded.trades || [],
+  symbols: loaded.symbols || SYMBOLS.slice(),
+  setups: loaded.setups || SETUPS.slice(),
+  mistakes: loaded.mistakes || MISTAKES.slice(),
+  startingCapital: loaded.startingCapital || 10000,
+  range: '90d',
+  form: null,
+  editingId: null,
+};
+
+function inRange(tr){
+  if (state.range==='all') return true;
+  const days = state.range==='7d'?7:state.range==='30d'?30:90;
+  const t0 = Date.now() - days*86400000;
+  return new Date(tr.openedAt).getTime() >= t0;
+}
+function stats(){
+  const list = state.trades.filter(inRange);
+  const closed = list.filter(x => x.status==='closed' && x.pnl!=null);
+  const pnl = closed.reduce((a,x)=>a+(x.pnl||0)-(x.fees||0),0);
+  const wins = closed.filter(x => (x.pnl||0)>0).length;
+  const wr = closed.length ? (wins/closed.length)*100 : 0;
+  const rs = closed.map(x => x.rMultiple).filter(x => x!=null);
+  const r = rs.length ? rs.reduce((a,b)=>a+b,0)/rs.length : 0;
+  return { list, closed, pnl, wr, r, n: list.length };
+}
+function computeR(pnl, risk){
+  if (pnl==null || !risk) return null;
+  return pnl / risk;
+}
+
+function el(html){ const d=document.createElement('div'); d.innerHTML=html; return d.firstElementChild; }
+function esc(s){ return String(s??'').replace(/[&<>"']/g, c => ({'&':'&','<':'<','>':'>','"':'"',"'":'&#039;'}[c])); }
+
+function renderNav(){
+  const items = [
+    ['home', t('home'), 'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'],
+    ['trades', t('trades'), 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01'],
+    ['cal', t('cal'), 'M3 4h18v16H3zM8 2v4M16 2v4M3 10h18'],
+    ['an', t('an'), 'M4 19V9m6 10V5m6 14v-7'],
+    ['set', t('set'), 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z'],
+  ];
+  document.getElementById('nav').innerHTML = items.map(([id,label,d]) =>
+    `<button class="${state.view===id?'on':''}" data-v="${id}">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="${d}"/></svg>${esc(label)}
+    </button>`
+  ).join('');
+  document.getElementById('nav').onclick = (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    state.view = b.dataset.v; state.form=null; render();
+  };
+}
+
+function header(extra){
+  return `<div class="top">
+    <div class="brand"><img src="./icon-192.png" alt=""><h1>Kairos</h1></div>
+    <div style="display:flex;gap:8px">${extra||''}<button class="primary" id="btnNew">+ ${esc(t('new'))}</button></div>
+  </div>`;
+}
+function ranges(){
+  return `<div class="ranges">${['7d','30d','90d','all'].map(r=>`<button data-r="${r}" class="${state.range===r?'on':''}">${r.toUpperCase()}</button>`).join('')}</div>`;
+}
+
+function renderHome(){
+  const s = stats();
+  if (!state.trades.length) {
+    return header() + `<div class="empty"><h2>${esc(t('empty'))}</h2><p>${esc(t('emptySub'))}</p>
+      <button class="primary block" id="btnNew2">${esc(t('new'))}</button></div>`;
+  }
+  return header() + ranges() + `<div class="kpis">
+    <div class="kpi"><div class="l">${esc(t('pnl'))}</div><div class="v ${clsPnl(s.pnl)}">${fmtMoney(s.pnl)}</div></div>
+    <div class="kpi"><div class="l">${esc(t('wr'))}</div><div class="v">${fmtN(s.wr,1)}%</div></div>
+    <div class="kpi"><div class="l">${esc(t('r'))}</div><div class="v">${fmtN(s.r,2)} R</div></div>
+    <div class="kpi"><div class="l">${esc(t('n'))}</div><div class="v">${s.n}</div></div>
+  </div>
+  <div class="card" style="margin-bottom:14px"><canvas id="eq"></canvas></div>
+  ${tradeList(s.list.slice(0,8))}`;
+}
+function tradeList(list){
+  if (!list.length) return `<div class="card tiny">${esc(t('empty'))}</div>`;
+  return `<div class="card">${list.map(tr => `
+    <div class="row" data-id="${tr.id}">
+      <div><div class="sym">${esc(tr.symbol)} <span class="pill">${esc(tr.direction)}</span></div>
+      <div class="meta">${esc(tr.setup||'—')} · ${new Date(tr.openedAt).toLocaleDateString(state.locale==='en'?'en':'it')}</div></div>
+      <div class="${clsPnl((tr.pnl||0)-(tr.fees||0))}" style="font-family:IBM Plex Mono,monospace">${tr.pnl==null?'—':fmtMoney((tr.pnl||0)-(tr.fees||0))}</div>
+    </div>`).join('')}</div>`;
+}
+function renderTrades(){ return header() + ranges() + tradeList(state.trades.filter(inRange)); }
+function renderCal(){
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth();
+  const first = new Date(y,m,1).getDay();
+  const days = new Date(y,m+1,0).getDate();
+  const byDay = {};
+  state.trades.forEach(tr => {
+    const d = new Date(tr.openedAt);
+    if (d.getMonth()!==m || d.getFullYear()!==y) return;
+    const k = d.getDate();
+    byDay[k] = (byDay[k]||0) + ((tr.pnl||0)-(tr.fees||0));
+  });
+  let cells = '';
+  for (let i=0;i<first;i++) cells += `<div></div>`;
+  for (let d=1;d<=days;d++){
+    const v = byDay[d];
+    const c = v>0?'p':v<0?'n':'';
+    cells += `<div class="d ${c}">${d}</div>`;
+  }
+  return header() + `<div class="card"><div class="heat">${cells}</div></div>`;
+}
+function renderAn(){
+  const s = stats();
+  function group(key){
+    const map = {};
+    s.closed.forEach(tr => {
+      const k = (key==='mistakes' ? (tr.mistakes||[])[0] : tr[key]) || '—';
+      map[k] = map[k] || {n:0,pnl:0};
+      map[k].n++; map[k].pnl += (tr.pnl||0)-(tr.fees||0);
+    });
+    return Object.entries(map).sort((a,b)=>b[1].pnl-a[1].pnl);
+  }
+  function table(title, rows){
+    return `<div class="card" style="margin-bottom:12px"><div class="l" style="color:var(--muted);margin-bottom:8px">${esc(title)}</div>
+      ${rows.map(([k,v])=>`<div class="row"><div>${esc(k)} <span class="tiny">×${v.n}</span></div><div class="${clsPnl(v.pnl)}">${fmtMoney(v.pnl)}</div></div>`).join('')||'<div class="tiny">—</div>'}</div>`;
+  }
+  return header() + ranges() + table(t('pair'), group('symbol')) + table(t('setup'), group('setup')) + table(t('mistakes'), group('mistakes'));
+}
+function renderSet(){
+  function cat(kind, list){
+    return `<div class="card" style="margin-bottom:12px"><b>${esc(t(kind==='symbols'?'symbols':kind==='setups'?'setups':'mistakes'))}</b>
+      ${list.map(v=>`<div class="item"><b>${esc(v)}</b>
+        <span><button class="tiny" data-ren="${kind}:${esc(v)}">${esc(t('rename'))}</button>
+        <button class="tiny" data-del="${kind}:${esc(v)}">${esc(t('del'))}</button></span></div>`).join('')}
+      <div class="cat"><input placeholder="${esc(t('add'))}" data-add="${kind}"><button class="ghost" data-addbtn="${kind}">${esc(t('add'))}</button></div>
+    </div>`;
+  }
+  return header('') + `<h2 style="font-family:Newsreader,Georgia,serif;margin-bottom:12px">${esc(t('set'))}</h2>
+    <div class="field"><label>${esc(t('capital'))}</label><input id="cap" inputmode="decimal" value="${fmtN(state.startingCapital,0)}"></div>
+    <div class="field"><label>${esc(t('lang'))}</label>
+      <select id="lang">${['it','en','es','fr','de'].map(l=>`<option ${state.locale===l?'selected':''}>${l}</option>`).join('')}</select></div>
+    ${cat('symbols', state.symbols)}${cat('setups', state.setups)}${cat('mistakes', state.mistakes)}
+    <div class="actions"><button class="ghost" id="exp">${esc(t('export'))}</button>
+      <button class="ghost" id="imp">${esc(t('imp'))}</button></div>
+    <div class="actions"><button class="danger" id="clr">${esc(t('clear'))}</button></div>
+    <input type="file" id="file" accept="application/json" hidden>`;
+}
+
+function openForm(id){
+  const tr = id ? state.trades.find(x=>x.id===id) : null;
+  state.editingId = id || null;
+  state.form = tr ? {...tr} : {
+    symbol: state.symbols[0]||'EURUSD', assetClass:'forex', direction:'long', setup: state.setups[0]||'FVG',
+    session:'london', status:'closed', openedAt: new Date().toISOString(), closedAt: new Date().toISOString(),
+    entry:null, exit:null, stop:null, takeProfit:null, size:null, fees:0, pnl:null, risk:null,
+    mood:null, notes:'', mistakes:[]
+  };
+  render();
+}
+function numVal(n){ return n==null?'': String(n).replace('.', ','); }
+function renderForm(){
+  const f = state.form;
+  const chip = (list, cur, key) => list.map(v=>`<button type="button" class="chip ${cur===v?'on':''}" data-k="${key}" data-v="${esc(v)}">${esc(v)}</button>`).join('');
+  return `<div class="sheet"><div class="top"><button class="ghost" id="cancel">${esc(t('cancel'))}</button>
+    <button class="primary" id="save">${esc(t('save'))}</button></div>
+    <h2>${esc(state.editingId?t('trades'):t('new'))}</h2>
+    <div class="field"><label>${esc(t('pair'))}</label><div class="chips" id="c-sym">${chip(state.symbols,f.symbol,'symbol')}</div></div>
+    <div class="field"><label>${esc(t('dir'))}</label><div class="chips">
+      <button class="chip ${f.direction==='long'?'on':''}" data-k="direction" data-v="long">${esc(t('long'))}</button>
+      <button class="chip ${f.direction==='short'?'on':''}" data-k="direction" data-v="short">${esc(t('short'))}</button>
+    </div></div>
+    <div class="field"><label>${esc(t('setup'))}</label><div class="chips">${chip(state.setups,f.setup,'setup')}</div></div>
+    <div class="field"><label>${esc(t('session'))}</label><div class="chips">${chip(SESSIONS,f.session,'session')}</div></div>
+    <div class="field"><label>${esc(t('status'))}</label><div class="chips">
+      <button class="chip ${f.status==='open'?'on':''}" data-k="status" data-v="open">${esc(t('open'))}</button>
+      <button class="chip ${f.status==='closed'?'on':''}" data-k="status" data-v="closed">${esc(t('closed'))}</button>
+    </div></div>
+    <div class="grid2">
+      <div class="field"><label>${esc(t('entry'))}</label><input id="f-entry" inputmode="decimal" value="${esc(numVal(f.entry))}"></div>
+      <div class="field"><label>${esc(t('exit'))}</label><input id="f-exit" inputmode="decimal" value="${esc(numVal(f.exit))}"></div>
+      <div class="field"><label>${esc(t('stop'))}</label><input id="f-stop" inputmode="decimal" value="${esc(numVal(f.stop))}"></div>
+      <div class="field"><label>${esc(t('tp'))}</label><input id="f-tp" inputmode="decimal" value="${esc(numVal(f.takeProfit))}"></div>
+      <div class="field"><label>${esc(t('size'))}</label><input id="f-size" inputmode="decimal" value="${esc(numVal(f.size))}"></div>
+      <div class="field"><label>${esc(t('fees'))}</label><input id="f-fees" inputmode="decimal" value="${esc(numVal(f.fees||0))}"></div>
+      <div class="field"><label>${esc(t('pnl'))}</label><input id="f-pnl" inputmode="decimal" value="${esc(numVal(f.pnl))}"></div>
+      <div class="field"><label>${esc(t('risk'))}</label><input id="f-risk" inputmode="decimal" value="${esc(numVal(f.risk))}"></div>
+    </div>
+    <div class="field"><label>${esc(t('notes'))}</label><textarea id="f-notes">${esc(f.notes)}</textarea></div>
+    <div class="field"><label>${esc(t('mistakes'))}</label><div class="chips" id="c-mis">
+      ${state.mistakes.map(v=>`<button type="button" class="chip ${(f.mistakes||[]).includes(v)?'on':''}" data-mis="${esc(v)}">${esc(v)}</button>`).join('')}
+    </div></div>
+    ${state.editingId?`<div class="actions"><button class="danger" id="del">${esc(t('del'))}</button></div>`:''}
+  </div>`;
+}
+
+function drawEq(){
+  const c = document.getElementById('eq'); if (!c) return;
+  const closed = state.trades.filter(inRange).filter(x=>x.pnl!=null).slice().reverse();
+  const w = c.width = c.clientWidth * devicePixelRatio;
+  const h = c.height = 140 * devicePixelRatio;
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0,0,w,h);
+  let eq = state.startingCapital, pts=[eq];
+  closed.forEach(tr => { eq += (tr.pnl||0)-(tr.fees||0); pts.push(eq); });
+  const min = Math.min(...pts), max = Math.max(...pts);
+  const span = (max-min)||1;
+  ctx.strokeStyle = pts[pts.length-1]>=pts[0] ? '#6AAB7F' : '#D07060';
+  ctx.lineWidth = 2*devicePixelRatio;
+  ctx.beginPath();
+  pts.forEach((p,i)=>{
+    const x = (i/(pts.length-1||1))*w;
+    const y = h - ((p-min)/span)*(h-8) - 4;
+    i?ctx.lineTo(x,y):ctx.moveTo(x,y);
+  });
+  ctx.stroke();
+}
+
+function render(){
+  document.documentElement.lang = state.locale;
+  renderNav();
+  const app = document.getElementById('app');
+  if (state.form) { app.innerHTML = renderForm(); bindForm(); return; }
+  app.innerHTML = ({home:renderHome, trades:renderTrades, cal:renderCal, an:renderAn, set:renderSet})[state.view]();
+  bind();
+  drawEq();
+}
+function bind(){
+  const n = (id)=>document.getElementById(id);
+  n('btnNew') && (n('btnNew').onclick = ()=>openForm());
+  n('btnNew2') && (n('btnNew2').onclick = ()=>openForm());
+  document.querySelectorAll('[data-r]').forEach(b => b.onclick = ()=>{ state.range=b.dataset.r; render(); });
+  document.querySelectorAll('.row[data-id]').forEach(r => r.onclick = ()=>openForm(r.dataset.id));
+  if (state.view==='set'){
+    n('lang').onchange = ()=>{ state.locale=n('lang').value; save(); render(); };
+    n('cap').onchange = ()=>{ const v=parseIt(n('cap').value); if(v!=null){ state.startingCapital=v; save(); } };
+    document.querySelectorAll('[data-addbtn]').forEach(b => b.onclick = ()=>{
+      const kind=b.dataset.addbtn; const inp=document.querySelector(`[data-add="${kind}"]`);
+      addCat(kind, inp.value); inp.value='';
+    });
+    document.querySelectorAll('[data-del]').forEach(b => b.onclick = ()=>{
+      const [kind,v]=b.dataset.del.split(':'); delCat(kind,v);
+    });
+    document.querySelectorAll('[data-ren]').forEach(b => b.onclick = ()=>{
+      const [kind,v]=b.dataset.ren.split(':');
+      const nv=prompt(t('rename'), v); if(nv) renameCat(kind,v,nv);
+    });
+    n('exp').onclick = ()=>{
+      const blob=new Blob([JSON.stringify({version:1, ...state, exportedAt:new Date().toISOString()},null,2)],{type:'application/json'});
+      const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='kairos.json'; a.click();
+    };
+    n('imp').onclick = ()=>n('file').click();
+    n('file').onchange = (e)=>{
+      const file=e.target.files[0]; if(!file) return;
+      const rd=new FileReader();
+      rd.onload=()=>{ try{
+        const d=JSON.parse(rd.result);
+        if(d.trades) state.trades=d.trades;
+        if(d.symbols) state.symbols=d.symbols;
+        if(d.setups) state.setups=d.setups;
+        if(d.mistakes) state.mistakes=d.mistakes;
+        if(d.startingCapital) state.startingCapital=d.startingCapital;
+        save(); render();
+      }catch(err){ alert('JSON'); } };
+      rd.readAsText(file);
+    };
+    n('clr').onclick = ()=>{ if(confirm(t('clear')+'?')){ state.trades=[]; save(); render(); } };
+  }
+}
+function addCat(kind, v){
+  v = kind==='symbols'? v.trim().toUpperCase() : v.trim();
+  if(!v) return;
+  if(!state[kind].some(x=>x.toLowerCase()===v.toLowerCase())) state[kind].push(v);
+  save(); render();
+}
+function delCat(kind,v){
+  state[kind]=state[kind].filter(x=>x!==v);
+  if(kind==='symbols') state.trades.forEach(tr=>{ if(tr.symbol===v) tr.symbol=''; });
+  if(kind==='setups') state.trades.forEach(tr=>{ if(tr.setup===v) tr.setup=''; });
+  if(kind==='mistakes') state.trades.forEach(tr=>{ tr.mistakes=(tr.mistakes||[]).filter(m=>m!==v); });
+  save(); render();
+}
+function renameCat(kind,from,to){
+  to = kind==='symbols'? to.trim().toUpperCase() : to.trim();
+  if(!to) return;
+  state[kind]=state[kind].map(x=>x===from?to:x);
+  if(kind==='symbols') state.trades.forEach(tr=>{ if(tr.symbol===from) tr.symbol=to; });
+  if(kind==='setups') state.trades.forEach(tr=>{ if(tr.setup===from) tr.setup=to; });
+  if(kind==='mistakes') state.trades.forEach(tr=>{ tr.mistakes=(tr.mistakes||[]).map(m=>m===from?to:m); });
+  save(); render();
+}
+function bindForm(){
+  document.getElementById('cancel').onclick=()=>{ state.form=null; render(); };
+  document.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{ state.form[b.dataset.k]=b.dataset.v; render(); });
+  document.querySelectorAll('[data-mis]').forEach(b=>b.onclick=()=>{
+    const v=b.dataset.mis; const a=state.form.mistakes||[];
+    state.form.mistakes = a.includes(v)? a.filter(x=>x!==v): a.concat(v);
+    render();
+  });
+  document.getElementById('save').onclick=()=>{
+    const f=state.form;
+    f.entry=parseIt(document.getElementById('f-entry').value);
+    f.exit=parseIt(document.getElementById('f-exit').value);
+    f.stop=parseIt(document.getElementById('f-stop').value);
+    f.takeProfit=parseIt(document.getElementById('f-tp').value);
+    f.size=parseIt(document.getElementById('f-size').value);
+    f.fees=parseIt(document.getElementById('f-fees').value)||0;
+    f.pnl=parseIt(document.getElementById('f-pnl').value);
+    f.risk=parseIt(document.getElementById('f-risk').value);
+    f.notes=document.getElementById('f-notes').value;
+    f.rMultiple=computeR(f.pnl,f.risk);
+    const now=new Date().toISOString();
+    if(state.editingId){
+      state.trades=state.trades.map(tr=>tr.id===state.editingId?{...tr,...f,id:tr.id,updatedAt:now}:tr);
+    } else {
+      state.trades.unshift({...f,id:uid(),createdAt:now,updatedAt:now});
+    }
+    state.form=null; state.editingId=null; save(); render();
+  };
+  const del=document.getElementById('del');
+  if(del) del.onclick=()=>{
+    if(confirm(t('del')+'?')){ state.trades=state.trades.filter(x=>x.id!==state.editingId); state.form=null; save(); render(); }
+  };
+}
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  });
+}
+render();
+</script>
+</body>
+</html>
