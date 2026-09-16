@@ -1,6 +1,6 @@
 // Kairos service worker — network-first per l'HTML (aggiornamenti immediati),
 // cache-first per gli asset statici. Offline: fallback alla cache.
-const CACHE = 'kairos-v1';
+const CACHE = 'kairos-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -29,6 +29,8 @@ self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
+  // Never intercept chat API (polling + live data)
+  if (url.pathname.includes('/api/')) return;
 
   const isAppShell = req.mode === 'navigate'
     || (url.origin === location.origin

@@ -1,0 +1,14 @@
+{
+  "name": "kairos-vega-chat",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mini chat API for Kairos + Vega bot",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

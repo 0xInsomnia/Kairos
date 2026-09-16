@@ -128,11 +128,95 @@ canvas { width: 100%; height: 140px; display: block; }
 .heat .d { aspect-ratio: 1; border-radius: 4px; background: #1a1b1e; font-size: 10px; display: grid; place-items: center; color: var(--muted); }
 .heat .d.p { background: rgba(106,171,127,.35); color: #cfe8d6; }
 .heat .d.n { background: rgba(208,112,96,.35); color: #f3cfc8; }
+
+/* Vega mini-chat */
+.chat-fab {
+  position: fixed; right: 16px; bottom: calc(72px + env(safe-area-inset-bottom));
+  z-index: 25; width: 52px; height: 52px; border-radius: 16px;
+  background: var(--primary); color: var(--on-primary);
+  box-shadow: 0 8px 24px rgba(0,0,0,.35);
+  display: grid; place-items: center;
+}
+.chat-fab .badge {
+  position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px;
+  padding: 0 5px; border-radius: 999px; background: var(--loss); color: #fff;
+  font-size: 11px; font-weight: 600; display: none; align-items: center; justify-content: center;
+}
+.chat-fab .badge.on { display: flex; }
+.chat-panel {
+  position: fixed; inset: 0; z-index: 40; display: none;
+  background: rgba(0,0,0,.45); backdrop-filter: blur(4px);
+}
+.chat-panel.open { display: block; }
+.chat-sheet {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  max-height: min(78vh, 640px); background: var(--bg);
+  border-top: 1px solid var(--line); border-radius: 18px 18px 0 0;
+  display: flex; flex-direction: column;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.chat-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; border-bottom: 1px solid var(--line); gap: 10px;
+}
+.chat-head h3 { font-family: Newsreader, Georgia, serif; font-size: 20px; font-weight: 600; }
+.chat-status { font-size: 11px; color: var(--muted); }
+.chat-status.ok { color: var(--profit); }
+.chat-status.err { color: var(--loss); }
+.chat-msgs {
+  flex: 1; overflow: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 10px;
+  min-height: 180px;
+}
+.chat-bubble {
+  max-width: 88%; padding: 10px 12px; border-radius: 14px; font-size: 14px; line-height: 1.4;
+  border: 1px solid var(--line); white-space: pre-wrap; word-break: break-word;
+}
+.chat-bubble.user {
+  align-self: flex-end; background: var(--primary); color: var(--on-primary); border-color: transparent;
+}
+.chat-bubble.assistant { align-self: flex-start; background: var(--card); }
+.chat-bubble .who { font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+.chat-bubble.user .who { color: rgba(11,12,14,.55); }
+.chat-meta { font-size: 10px; color: var(--muted); margin-top: 6px; }
+.chat-empty { text-align: center; color: var(--muted); padding: 28px 12px; font-size: 13px; }
+.chat-compose {
+  display: flex; gap: 8px; padding: 10px 12px 12px; border-top: 1px solid var(--line);
+  align-items: flex-end;
+}
+.chat-compose textarea {
+  flex: 1; min-height: 44px; max-height: 120px; resize: none;
+  background: #17181b; border: 1px solid var(--input); border-radius: 12px;
+  padding: 10px 12px; color: var(--fg);
+}
+.chat-compose .primary { padding: 12px 16px; flex-shrink: 0; }
+
 </style>
 </head>
 <body>
 <div class="wrap" id="app"></div>
 <nav class="nav" id="nav"></nav>
+
+<button type="button" class="chat-fab" id="chatFab" aria-label="Vega chat" title="Vega chat">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a4 4 0 0 1-4 4H7l-4 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>
+  <span class="badge" id="chatBadge">0</span>
+</button>
+<div class="chat-panel" id="chatPanel" aria-hidden="true">
+  <div class="chat-sheet" role="dialog" aria-label="Vega chat">
+    <div class="chat-head">
+      <div>
+        <h3>Vega</h3>
+        <div class="chat-status" id="chatStatus">…</div>
+      </div>
+      <button type="button" class="ghost" id="chatClose">Chiudi</button>
+    </div>
+    <div class="chat-msgs" id="chatMsgs"></div>
+    <div class="chat-compose">
+      <textarea id="chatInput" rows="1" placeholder="Messaggio a Vega…"></textarea>
+      <button type="button" class="primary" id="chatSend">Invia</button>
+    </div>
+  </div>
+</div>
+
 <script>
 'use strict';
 const KEY = 'kairos-journal';
@@ -186,11 +270,84 @@ function clsPnl(n){ return n>0?'pos':n<0?'neg':''; }
 function load(){
   try { return JSON.parse(localStorage.getItem(KEY)||''); } catch { return null; }
 }
-function save(){
-  localStorage.setItem(KEY, JSON.stringify({
+function journalPayload(){
+  return {
     trades: state.trades, symbols: state.symbols, setups: state.setups,
     mistakes: state.mistakes, startingCapital: state.startingCapital, locale: state.locale
-  }));
+  };
+}
+function save(){
+  localStorage.setItem(KEY, JSON.stringify(journalPayload()));
+  pushJournalToServer();
+}
+function apiBase(){
+  try {
+    const stored = localStorage.getItem('kairos-chat-api');
+    if (stored) return stored.replace(/\/$/, '');
+  } catch {}
+  return '';
+}
+let journalSyncAt = null;
+let journalPushTimer = null;
+let journalPollTimer = null;
+function applyJournal(j, {renderUi}={renderUi:true}){
+  if (!j || typeof j !== 'object') return false;
+  if (Array.isArray(j.trades)) state.trades = j.trades;
+  if (Array.isArray(j.symbols) && j.symbols.length) state.symbols = j.symbols;
+  if (Array.isArray(j.setups) && j.setups.length) state.setups = j.setups;
+  if (Array.isArray(j.mistakes) && j.mistakes.length) state.mistakes = j.mistakes;
+  if (j.startingCapital != null && Number.isFinite(Number(j.startingCapital))) state.startingCapital = Number(j.startingCapital);
+  if (typeof j.locale === 'string' && j.locale) state.locale = j.locale;
+  journalSyncAt = j.updatedAt || journalSyncAt;
+  localStorage.setItem(KEY, JSON.stringify(journalPayload()));
+  if (renderUi && !state.form) render();
+  return true;
+}
+function pushJournalToServer(){
+  // debounce rapid saves
+  if (journalPushTimer) clearTimeout(journalPushTimer);
+  journalPushTimer = setTimeout(async () => {
+    try {
+      const res = await fetch(apiBase() + '/api/journal', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ journal: journalPayload() }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.journal && data.journal.updatedAt) journalSyncAt = data.journal.updatedAt;
+    } catch {}
+  }, 200);
+}
+async function pullJournalFromServer({forceRender}={forceRender:false}){
+  try {
+    const res = await fetch(apiBase() + '/api/journal', { cache: 'no-store' });
+    if (!res.ok) return false;
+    const data = await res.json();
+    const j = data.journal;
+    if (!j) return false;
+    // If server empty and we have local trades, push local up once
+    if ((!j.trades || !j.trades.length) && state.trades.length) {
+      pushJournalToServer();
+      journalSyncAt = j.updatedAt || journalSyncAt;
+      return true;
+    }
+    // Skip apply if nothing changed
+    if (!forceRender && j.updatedAt && j.updatedAt === journalSyncAt) return true;
+    // Prefer server when updatedAt is newer or first sync
+    const localNewer = false; // server is source of truth when API is up
+    if (!localNewer) applyJournal(j, { renderUi: forceRender || (j.updatedAt !== journalSyncAt) });
+    return true;
+  } catch {
+    return false;
+  }
+}
+function startJournalPoll(){
+  if (journalPollTimer) return;
+  journalPollTimer = setInterval(() => {
+    if (state.form) return; // don't clobber open editor
+    pullJournalFromServer({ forceRender: false });
+  }, 3000);
 }
 const loaded = load() || {};
 const state = {
@@ -228,7 +385,7 @@ function computeR(pnl, risk){
 }
 
 function el(html){ const d=document.createElement('div'); d.innerHTML=html; return d.firstElementChild; }
-function esc(s){ return String(s??'').replace(/[&<>"']/g, c => ({'&':'&','<':'<','>':'>','"':'"',"'":'&#039;'}[c])); }
+function esc(s){ return String(s??'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c])); }
 
 function renderNav(){
   const items = [
@@ -517,6 +674,214 @@ function bindForm(){
     if(confirm(t('del')+'?')){ state.trades=state.trades.filter(x=>x.id!==state.editingId); state.form=null; save(); render(); }
   };
 }
+
+
+/* —— Vega mini-chat —— */
+const CHAT_POLL_MS = 2500;
+const chatState = {
+  open: false,
+  messages: [],
+  lastId: null,
+  unseen: 0,
+  timer: null,
+  sending: false,
+  apiBase: null,
+};
+
+function chatApiBase() {
+  if (chatState.apiBase != null) return chatState.apiBase;
+  try {
+    const stored = localStorage.getItem('kairos-chat-api');
+    if (stored) { chatState.apiBase = stored.replace(/\/$/, ''); return chatState.apiBase; }
+  } catch {}
+  chatState.apiBase = ''; // same origin
+  return chatState.apiBase;
+}
+
+function chatUrl(path) {
+  return chatApiBase() + path;
+}
+
+function setChatStatus(text, kind) {
+  const el = document.getElementById('chatStatus');
+  if (!el) return;
+  el.textContent = text;
+  el.className = 'chat-status' + (kind ? ' ' + kind : '');
+}
+
+function fmtChatTime(iso) {
+  try {
+    return new Date(iso).toLocaleTimeString(state.locale === 'en' ? 'en-US' : 'it-IT', { hour: '2-digit', minute: '2-digit' });
+  } catch { return ''; }
+}
+
+function renderChatMessages(scrollBottom) {
+  const box = document.getElementById('chatMsgs');
+  if (!box) return;
+  const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+  if (!chatState.messages.length) {
+    box.innerHTML = '<div class="chat-empty">Nessun messaggio ancora.<br>Scrivi qualcosa — Vega risponde via API.</div>';
+  } else {
+    box.innerHTML = chatState.messages.map(m => {
+      const role = m.role === 'assistant' ? 'assistant' : 'user';
+      const who = role === 'assistant' ? 'Vega' : 'Tu';
+      return `<div class="chat-bubble ${role}" data-id="${esc(m.id)}">
+        <div class="who">${who}</div>${esc(m.content)}
+        <div class="chat-meta">${esc(fmtChatTime(m.createdAt))}</div>
+      </div>`;
+    }).join('');
+  }
+  if (scrollBottom || nearBottom) box.scrollTop = box.scrollHeight;
+  const badge = document.getElementById('chatBadge');
+  if (badge) {
+    if (!chatState.open && chatState.unseen > 0) {
+      badge.textContent = String(chatState.unseen > 9 ? '9+' : chatState.unseen);
+      badge.classList.add('on');
+    } else {
+      badge.classList.remove('on');
+    }
+  }
+}
+
+function mergeChatMessages(incoming) {
+  if (!incoming || !incoming.length) return 0;
+  const known = new Set(chatState.messages.map(m => m.id));
+  let added = 0;
+  incoming.forEach(m => {
+    if (!m || !m.id || known.has(m.id)) return;
+    chatState.messages.push(m);
+    known.add(m.id);
+    added++;
+    if (!chatState.open && m.role === 'assistant') chatState.unseen++;
+  });
+  chatState.messages.sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+  if (chatState.messages.length) {
+    chatState.lastId = chatState.messages[chatState.messages.length - 1].id;
+  }
+  return added;
+}
+
+async function pollChat(initial) {
+  try {
+    const q = chatState.lastId && !initial ? ('?after=' + encodeURIComponent(chatState.lastId)) : '';
+    const res = await fetch(chatUrl('/api/chat/messages' + q), { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const list = initial ? (data.messages || []) : (data.messages || []);
+    if (initial) {
+      chatState.messages = [];
+      chatState.lastId = null;
+    }
+    const n = mergeChatMessages(list);
+    setChatStatus('online · poll ' + (CHAT_POLL_MS / 1000) + 's', 'ok');
+    renderChatMessages(initial || n > 0);
+  } catch (err) {
+    setChatStatus('API offline — avvia server/', 'err');
+  }
+}
+
+function startChatPoll() {
+  stopChatPoll();
+  pollChat(true);
+  chatState.timer = setInterval(() => pollChat(false), CHAT_POLL_MS);
+}
+
+function stopChatPoll() {
+  if (chatState.timer) { clearInterval(chatState.timer); chatState.timer = null; }
+}
+
+function openChat() {
+  chatState.open = true;
+  chatState.unseen = 0;
+  const panel = document.getElementById('chatPanel');
+  panel.classList.add('open');
+  panel.setAttribute('aria-hidden', 'false');
+  renderChatMessages(true);
+  startChatPoll();
+  const inp = document.getElementById('chatInput');
+  if (inp) setTimeout(() => inp.focus(), 50);
+}
+
+function closeChat() {
+  chatState.open = false;
+  const panel = document.getElementById('chatPanel');
+  panel.classList.remove('open');
+  panel.setAttribute('aria-hidden', 'true');
+  // keep light background poll for badges? stop to save battery; restart on open
+  stopChatPoll();
+  // quiet background poll for assistant replies
+  chatState.timer = setInterval(() => pollChat(false), CHAT_POLL_MS * 2);
+  renderChatMessages(false);
+}
+
+async function sendChat() {
+  if (chatState.sending) return;
+  const inp = document.getElementById('chatInput');
+  const content = (inp && inp.value || '').trim();
+  if (!content) return;
+  chatState.sending = true;
+  const btn = document.getElementById('chatSend');
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch(chatUrl('/api/chat/messages'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content, role: 'user', source: 'ui' }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || ('HTTP ' + res.status));
+    }
+    const data = await res.json();
+    if (data.message) mergeChatMessages([data.message]);
+    if (inp) inp.value = '';
+    renderChatMessages(true);
+    setChatStatus('inviato', 'ok');
+  } catch (err) {
+    setChatStatus('invio fallito: ' + (err.message || 'error'), 'err');
+  } finally {
+    chatState.sending = false;
+    if (btn) btn.disabled = false;
+  }
+}
+
+function bindChatUi() {
+  const fab = document.getElementById('chatFab');
+  const panel = document.getElementById('chatPanel');
+  const close = document.getElementById('chatClose');
+  const send = document.getElementById('chatSend');
+  const inp = document.getElementById('chatInput');
+  if (!fab || !panel) return;
+  fab.onclick = () => (chatState.open ? closeChat() : openChat());
+  close.onclick = () => closeChat();
+  panel.addEventListener('click', (e) => { if (e.target === panel) closeChat(); });
+  send.onclick = () => sendChat();
+  inp.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+  });
+  // background poll so badge updates even when closed
+  chatState.timer = setInterval(() => pollChat(false), CHAT_POLL_MS * 2);
+  pollChat(true);
+}
+
+bindChatUi();
+
+
+// Journal server sync (Vega inserts appear via poll)
+(async function initJournalSync(){
+  const ok = await pullJournalFromServer({ forceRender: true });
+  if (ok) startJournalPoll();
+  else {
+    // retry a few times in case server starts after UI
+    let n = 0;
+    const tmr = setInterval(async () => {
+      n++;
+      const ok2 = await pullJournalFromServer({ forceRender: true });
+      if (ok2) { clearInterval(tmr); startJournalPoll(); }
+      if (n > 10) clearInterval(tmr);
+    }, 2000);
+  }
+})();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
