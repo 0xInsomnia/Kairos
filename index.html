@@ -270,11 +270,84 @@ function clsPnl(n){ return n>0?'pos':n<0?'neg':''; }
 function load(){
   try { return JSON.parse(localStorage.getItem(KEY)||''); } catch { return null; }
 }
-function save(){
-  localStorage.setItem(KEY, JSON.stringify({
+function journalPayload(){
+  return {
     trades: state.trades, symbols: state.symbols, setups: state.setups,
     mistakes: state.mistakes, startingCapital: state.startingCapital, locale: state.locale
-  }));
+  };
+}
+function save(){
+  localStorage.setItem(KEY, JSON.stringify(journalPayload()));
+  pushJournalToServer();
+}
+function apiBase(){
+  try {
+    const stored = localStorage.getItem('kairos-chat-api');
+    if (stored) return stored.replace(/\/$/, '');
+  } catch {}
+  return '';
+}
+let journalSyncAt = null;
+let journalPushTimer = null;
+let journalPollTimer = null;
+function applyJournal(j, {renderUi}={renderUi:true}){
+  if (!j || typeof j !== 'object') return false;
+  if (Array.isArray(j.trades)) state.trades = j.trades;
+  if (Array.isArray(j.symbols) && j.symbols.length) state.symbols = j.symbols;
+  if (Array.isArray(j.setups) && j.setups.length) state.setups = j.setups;
+  if (Array.isArray(j.mistakes) && j.mistakes.length) state.mistakes = j.mistakes;
+  if (j.startingCapital != null && Number.isFinite(Number(j.startingCapital))) state.startingCapital = Number(j.startingCapital);
+  if (typeof j.locale === 'string' && j.locale) state.locale = j.locale;
+  journalSyncAt = j.updatedAt || journalSyncAt;
+  localStorage.setItem(KEY, JSON.stringify(journalPayload()));
+  if (renderUi && !state.form) render();
+  return true;
+}
+function pushJournalToServer(){
+  // debounce rapid saves
+  if (journalPushTimer) clearTimeout(journalPushTimer);
+  journalPushTimer = setTimeout(async () => {
+    try {
+      const res = await fetch(apiBase() + '/api/journal', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ journal: journalPayload() }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.journal && data.journal.updatedAt) journalSyncAt = data.journal.updatedAt;
+    } catch {}
+  }, 200);
+}
+async function pullJournalFromServer({forceRender}={forceRender:false}){
+  try {
+    const res = await fetch(apiBase() + '/api/journal', { cache: 'no-store' });
+    if (!res.ok) return false;
+    const data = await res.json();
+    const j = data.journal;
+    if (!j) return false;
+    // If server empty and we have local trades, push local up once
+    if ((!j.trades || !j.trades.length) && state.trades.length) {
+      pushJournalToServer();
+      journalSyncAt = j.updatedAt || journalSyncAt;
+      return true;
+    }
+    // Skip apply if nothing changed
+    if (!forceRender && j.updatedAt && j.updatedAt === journalSyncAt) return true;
+    // Prefer server when updatedAt is newer or first sync
+    const localNewer = false; // server is source of truth when API is up
+    if (!localNewer) applyJournal(j, { renderUi: forceRender || (j.updatedAt !== journalSyncAt) });
+    return true;
+  } catch {
+    return false;
+  }
+}
+function startJournalPoll(){
+  if (journalPollTimer) return;
+  journalPollTimer = setInterval(() => {
+    if (state.form) return; // don't clobber open editor
+    pullJournalFromServer({ forceRender: false });
+  }, 3000);
 }
 const loaded = load() || {};
 const state = {
@@ -792,6 +865,23 @@ function bindChatUi() {
 }
 
 bindChatUi();
+
+
+// Journal server sync (Vega inserts appear via poll)
+(async function initJournalSync(){
+  const ok = await pullJournalFromServer({ forceRender: true });
+  if (ok) startJournalPoll();
+  else {
+    // retry a few times in case server starts after UI
+    let n = 0;
+    const tmr = setInterval(async () => {
+      n++;
+      const ok2 = await pullJournalFromServer({ forceRender: true });
+      if (ok2) { clearInterval(tmr); startJournalPoll(); }
+      if (n > 10) clearInterval(tmr);
+    }, 2000);
+  }
+})();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
