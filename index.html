@@ -358,7 +358,7 @@ const state = {
   setups: loaded.setups || SETUPS.slice(),
   mistakes: loaded.mistakes || MISTAKES.slice(),
   startingCapital: loaded.startingCapital || 10000,
-  range: '90d',
+  range: 'all',
   form: null,
   editingId: null,
 };
@@ -888,7 +888,26 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch(()=>{});
   });
 }
-render();
+async function seedBybit(){
+  try {
+    if (localStorage.getItem('kairos-bybit-seed') === '1') return;
+    const res = await fetch('./kairos-bybit.json', { cache: 'no-store' });
+    if (!res.ok) return;
+    const d = await res.json();
+    if (!Array.isArray(d.trades) || !d.trades.length) return;
+    state.trades = d.trades;
+    if (Array.isArray(d.symbols)) {
+      d.symbols.forEach(s => { if (s && !state.symbols.includes(s)) state.symbols.push(s); });
+    }
+    if (Array.isArray(d.setups)) {
+      d.setups.forEach(s => { if (s && !state.setups.includes(s)) state.setups.push(s); });
+    }
+    state.range = 'all';
+    localStorage.setItem('kairos-bybit-seed', '1');
+    save();
+  } catch {}
+}
+seedBybit().finally(() => render());
 </script>
 </body>
 </html>
