@@ -1,6 +1,6 @@
 // Kairos service worker — network-first per l'HTML (aggiornamenti immediati),
 // cache-first per gli asset statici. Offline: fallback alla cache.
-const CACHE = 'kairos-v3';
+const CACHE = 'kairos-v4';
 const ASSETS = [
   './',
   './index.html',

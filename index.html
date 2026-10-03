@@ -888,22 +888,33 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch(()=>{});
   });
 }
+function isOptionTrade(t){
+  const sym = String(t.symbol || '');
+  const notes = String(t.notes || '');
+  return t.setup === 'Options' || /option/i.test(notes) || sym.includes('-C-') || sym.includes('-P-');
+}
 async function seedBybit(){
   try {
-    if (localStorage.getItem('kairos-bybit-seed') === '1') return;
+    if (localStorage.getItem('kairos-bybit-seed') === '1') {
+      if (localStorage.getItem('kairos-bybit-no-options') === '1') return;
+      state.trades = state.trades.filter(t => !isOptionTrade(t));
+      state.symbols = state.symbols.filter(s => !String(s).includes('-C-') && !String(s).includes('-P-'));
+      state.setups = state.setups.filter(s => s !== 'Options');
+      localStorage.setItem('kairos-bybit-no-options', '1');
+      save();
+      return;
+    }
     const res = await fetch('./kairos-bybit.json', { cache: 'no-store' });
     if (!res.ok) return;
     const d = await res.json();
     if (!Array.isArray(d.trades) || !d.trades.length) return;
-    state.trades = d.trades;
+    state.trades = d.trades.filter(t => !isOptionTrade(t));
     if (Array.isArray(d.symbols)) {
-      d.symbols.forEach(s => { if (s && !state.symbols.includes(s)) state.symbols.push(s); });
-    }
-    if (Array.isArray(d.setups)) {
-      d.setups.forEach(s => { if (s && !state.setups.includes(s)) state.setups.push(s); });
+      d.symbols.forEach(s => { if (s && !state.symbols.includes(s) && !isOptionTrade({symbol:s})) state.symbols.push(s); });
     }
     state.range = 'all';
     localStorage.setItem('kairos-bybit-seed', '1');
+    localStorage.setItem('kairos-bybit-no-options', '1');
     save();
   } catch {}
 }
